@@ -2,8 +2,16 @@ import type { Request, Response, NextFunction } from "express";
 import UserService from "../services/user.service";
 import { autoInjectable } from "tsyringe";
 import ApiError from "../utils/ApiError";
+import { User } from "../entities/User";
 
-interface MM extends Request {
+interface RegisterRequest extends Request {
+	body: {
+		email: string;
+		password: string;
+	};
+}
+
+interface LoginRequest extends Request {
 	body: {
 		email: string;
 		password: string;
@@ -18,10 +26,19 @@ class UserController {
 		this.userService = userService;
 	}
 
-	createUser = async (req: MM, res: Response, next: NextFunction) => {
+	createUser = async (
+		req: RegisterRequest,
+		res: Response,
+		next: NextFunction
+	) => {
+		let user: User;
 		try {
 			const { email, password } = req.body;
-			await this.userService.createUser({ email, password });
+
+			user = await this.userService.createUser({
+				email,
+				password,
+			});
 		} catch (err) {
 			const { code } = err;
 			if (code === "23505") {
@@ -30,7 +47,35 @@ class UserController {
 			return next(ApiError.internal("Something went wrong"));
 		}
 
-		return res.status(201).json("User created successfully");
+		req.session.userId = user.id;
+
+		return res.status(201).json({
+			email: user.email,
+			password: user.password,
+		});
+	};
+
+	login = async (req: LoginRequest, res: Response, next: NextFunction) => {
+		const { email, password } = req.body;
+
+		let user: User | null;
+
+		try {
+			user = await this.userService.loginUser({ email, password });
+		} catch (err) {
+			return next(ApiError.notFound("User not found"));
+		}
+
+		if (!user) {
+			return next(ApiError.badRequest("Wrong password"));
+		}
+
+		req.session.userId = user.id;
+
+		return res.status(200).json({
+			id: user.id,
+			email: user.email,
+		});
 	};
 }
 
