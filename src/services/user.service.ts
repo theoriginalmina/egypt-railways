@@ -1,21 +1,21 @@
 import { autoInjectable } from "tsyringe";
-import { IUser } from "../interfaces/user.interface";
-import UserRepository from "../repositories/user.repository";
 import { User } from "../entities/User";
 import hashStr from "../helpers/hashPassword";
 import unhashStr from "../helpers/unhashPassword";
+import { IUser } from "../interfaces/user.interface";
+import UserRepository from "../repositories/user.repository";
 
 @autoInjectable()
 class UserService {
-	userRepo: UserRepository;
+	private userRepo: UserRepository;
 
 	constructor(userRepo: UserRepository) {
 		this.userRepo = userRepo;
 	}
 
-	createUser = async ({ email, password }: IUser): Promise<User> => {
+	register = async ({ email, password }: IUser): Promise<User> => {
 		const hashedPassword = await hashStr(password);
-		const user = await this.userRepo.createUser({
+		const user = await this.userRepo.register({
 			email,
 			password: hashedPassword,
 		});
@@ -23,8 +23,8 @@ class UserService {
 		return user;
 	};
 
-	loginUser = async ({ email, password }: IUser): Promise<User | null> => {
-		const user = await this.userRepo.loginUser(email);
+	login = async ({ email, password }: IUser): Promise<User | null> => {
+		const user = await this.userRepo.login(email);
 		const valid = await unhashStr(password, user.password);
 
 		if (!valid) {

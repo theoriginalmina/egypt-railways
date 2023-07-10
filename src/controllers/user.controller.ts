@@ -1,32 +1,19 @@
-import type { Request, Response, NextFunction } from "express";
-import UserService from "../services/user.service";
+import type { NextFunction, Response } from "express";
 import { autoInjectable } from "tsyringe";
-import ApiError from "../utils/ApiError";
 import { User } from "../entities/User";
-
-interface RegisterRequest extends Request {
-	body: {
-		email: string;
-		password: string;
-	};
-}
-
-interface LoginRequest extends Request {
-	body: {
-		email: string;
-		password: string;
-	};
-}
+import { LoginRequest, RegisterRequest } from "../interfaces/user.interface";
+import UserService from "../services/user.service";
+import ApiError from "../utils/ApiError";
 
 @autoInjectable()
 class UserController {
-	userService: UserService;
+	private userService: UserService;
 
 	constructor(userService: UserService) {
 		this.userService = userService;
 	}
 
-	createUser = async (
+	register = async (
 		req: RegisterRequest,
 		res: Response,
 		next: NextFunction
@@ -35,14 +22,14 @@ class UserController {
 		try {
 			const { email, password } = req.body;
 
-			user = await this.userService.createUser({
+			user = await this.userService.register({
 				email,
 				password,
 			});
 		} catch (err) {
 			const { code } = err;
 			if (code === "23505") {
-				return next(ApiError.badRequest("Email already exists"));
+				return next(ApiError.conflict("Email already exists"));
 			}
 			return next(ApiError.internal("Something went wrong"));
 		}
@@ -50,8 +37,8 @@ class UserController {
 		req.session.userId = user.id;
 
 		return res.status(201).json({
+			id: user.id,
 			email: user.email,
-			password: user.password,
 		});
 	};
 
@@ -61,7 +48,7 @@ class UserController {
 		let user: User | null;
 
 		try {
-			user = await this.userService.loginUser({ email, password });
+			user = await this.userService.login({ email, password });
 		} catch (err) {
 			return next(ApiError.notFound("User not found"));
 		}

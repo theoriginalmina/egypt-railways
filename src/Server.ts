@@ -1,13 +1,16 @@
+import RedisStore from "connect-redis";
 import type { Express } from "express";
 import express, { json } from "express";
-import AppDataSource from "./data-source";
-import routes from "./routes";
-import apiErrorHandler from "./middlewares/api-error-handler";
-import RedisStore from "connect-redis";
 import session from "express-session";
+import helmet from "helmet";
 import { createClient } from "redis";
+import "reflect-metadata";
+import type { DataSource } from "typeorm";
+import apiErrorHandler from "./middlewares/api-error-handler";
+import routes from "./routes";
 
 class Server {
+	mainDB: DataSource;
 	app: Express;
 	server: import("http").Server<
 		typeof import("http").IncomingMessage,
@@ -23,17 +26,18 @@ class Server {
 		disableTouch: true,
 	});
 
-	constructor() {
+	constructor(mainDB: DataSource) {
+		this.mainDB = mainDB;
 		this.app = express();
 		this.setup();
 	}
 
 	setup() {
-		// this.app.use(helmet());
+		this.app.use(helmet());
 		this.app.use(json());
 		this.app.use(
 			session({
-				name: "",
+				name: "qid",
 				store: this.redisStore,
 				cookie: {
 					maxAge: 1000 * 60 * 60 * 24 * 365, // one year
@@ -58,7 +62,8 @@ class Server {
 			console.log(`Server is running port ${this.port}`);
 		});
 
-		AppDataSource.initialize()
+		this.mainDB
+			.initialize()
 			.then(() => {
 				console.log("Data Source has been initialized!");
 			})
@@ -68,6 +73,16 @@ class Server {
 
 		this.redisClient.connect().catch(console.error);
 	}
+
+	connectToDBs = async () => {
+		await this.mainDB.initialize();
+		// this.redisClient.connect().catch(console.error);
+	};
+
+	disconnectToDBs = async () => {
+		await this.mainDB.destroy();
+		// await this.redisClient.disconnect();
+	};
 
 	stop(done: ((err?: Error | undefined) => void) | undefined) {
 		this.server.close(done);
